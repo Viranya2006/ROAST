@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Share2, Twitter } from "lucide-react";
 import { BackgroundEffects } from "@/components/background-effects";
 import { ScoreGauge } from "@/components/results/score-gauge";
 import { CategoryCard } from "@/components/results/category-card";
 import { TypewriterVerdict } from "@/components/results/typewriter-verdict";
 import { FixesList } from "@/components/results/fixes-list";
+import { SeverityBadge } from "@/components/severity-badge";
+import { SoundToggle } from "@/components/sound-toggle";
+import { useSound } from "@/lib/use-sound";
 
 interface RoastData {
   roastData: {
@@ -30,14 +33,37 @@ interface RoastData {
 export default function ResultsPage() {
   const [data, setData] = useState<RoastData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { playThunk } = useSound();
 
   useEffect(() => {
     const stored = sessionStorage.getItem("roastData");
     if (stored) {
       setData(JSON.parse(stored));
+      // Play thunk sound when results load
+      setTimeout(() => playThunk(), 500);
     }
     setIsLoading(false);
-  }, []);
+  }, [playThunk]);
+
+  const handleShareTwitter = () => {
+    if (!data) return;
+    const { roastData, url } = data;
+    const text = `Got roasted ${roastData.overallScore}/100 by ROAST: "${roastData.overallVerdict.slice(0, 60)}..."\n\nRoast your site:`;
+    const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`;
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCopyLink = async () => {
+    if (!data) return;
+    const { roastData, url } = data;
+    const ogUrl = `${window.location.origin}/api/og?score=${roastData.overallScore}&url=${encodeURIComponent(url)}&verdict=${encodeURIComponent(roastData.overallVerdict.slice(0, 80))}`;
+    try {
+      await navigator.clipboard.writeText(ogUrl);
+      alert("Share link copied!");
+    } catch {
+      alert("Failed to copy link");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -112,20 +138,24 @@ export default function ResultsPage() {
               </motion.span>
             </div>
 
-            <Link
-              href="/"
-              className="px-3 md:px-4 py-2 rounded-full text-xs md:text-sm font-medium border border-white/10 text-foreground hover:border-[#00FF41]/40 hover:text-[#00FF41] hover:shadow-[0_0_20px_rgba(0,255,65,0.15)] transition-all duration-300 whitespace-nowrap flex-shrink-0"
-            >
-              Roast Another
-            </Link>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <SoundToggle />
+              <Link
+                href="/"
+                className="px-3 md:px-4 py-2 rounded-full text-xs md:text-sm font-medium border border-white/10 text-foreground hover:border-[#00FF41]/40 hover:text-[#00FF41] hover:shadow-[0_0_20px_rgba(0,255,65,0.15)] transition-all duration-300 whitespace-nowrap"
+              >
+                Roast Another
+              </Link>
+            </div>
           </div>
         </motion.header>
 
         {/* Content */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 lg:py-24 space-y-16 md:space-y-24">
           {/* Hero Score Section */}
-          <section className="flex flex-col items-center">
+          <section className="flex flex-col items-center gap-6">
             <ScoreGauge score={roastData.overallScore} verdict={roastData.overallVerdict} />
+            <SeverityBadge score={roastData.overallScore} size="lg" showDescription />
           </section>
 
           {/* Category Grid */}
@@ -161,17 +191,28 @@ export default function ResultsPage() {
             className="flex flex-col items-center gap-6 pb-8"
           >
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-              <button className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#00FF41] text-black font-bold text-sm md:text-base uppercase tracking-wider premium-button">
-                Share Your Shame
-              </button>
-              <Link
-                href="/"
-                className="w-full sm:w-auto px-8 py-4 rounded-full border border-white/20 text-foreground font-bold text-sm md:text-base uppercase tracking-wider hover:border-[#00FF41]/40 hover:text-[#00FF41] hover:shadow-[0_0_20px_rgba(0,255,65,0.15)] transition-all duration-300 text-center"
+              <button 
+                onClick={handleShareTwitter}
+                className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#00FF41] text-black font-bold text-sm md:text-base uppercase tracking-wider premium-button flex items-center justify-center gap-2"
               >
-                Roast Another Site
-              </Link>
+                <Twitter className="w-4 h-4" />
+                Share on X
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className="w-full sm:w-auto px-8 py-4 rounded-full border border-white/20 text-foreground font-bold text-sm md:text-base uppercase tracking-wider hover:border-[#00FF41]/40 hover:text-[#00FF41] hover:shadow-[0_0_20px_rgba(0,255,65,0.15)] transition-all duration-300 flex items-center justify-center gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Copy Share Link
+              </button>
             </div>
-            <p className="text-xs md:text-sm text-muted-foreground">
+            <Link
+              href="/"
+              className="text-sm text-muted-foreground hover:text-[#00FF41] transition-colors"
+            >
+              Roast Another Site
+            </Link>
+            <p className="text-xs text-muted-foreground">
               warn your developer before sharing
             </p>
           </motion.section>

@@ -4,6 +4,10 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowRight, Loader2 } from "lucide-react"
+import { RoastHistory } from "@/components/roast-history"
+import { SoundToggle } from "@/components/sound-toggle"
+import { useRoastHistory } from "@/lib/use-roast-history"
+import { useSound } from "@/lib/use-sound"
 
 function SoundWave() {
   return (
@@ -34,6 +38,8 @@ export function HeroSection() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { addRoast } = useRoastHistory()
+  const { playBeep, playSuccess } = useSound()
 
   const handleRoast = async () => {
     if (!url.trim() || isLoading) return
@@ -43,22 +49,29 @@ export function HeroSection() {
     setIsLoading(true)
 
     try {
+      playBeep()
+      
       const response = await fetch("/api/roast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       })
 
-      console.log("[v0] Response status:", response.status)
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error("[v0] API Error response:", errorData)
         throw new Error(errorData.details || errorData.error || "Failed to roast")
       }
 
       const data = await response.json()
-      console.log("[v0] Roast data received, score:", data?.roastData?.overallScore)
+      
+      // Save to history
+      addRoast(
+        data.url || url.trim(),
+        data.roastData?.overallScore || 0,
+        data.roastData?.overallVerdict || "No verdict"
+      )
+      
+      playSuccess()
       sessionStorage.setItem("roastData", JSON.stringify(data))
       router.push("/results")
     } catch (err) {
@@ -79,6 +92,11 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-24 md:py-32 overflow-hidden">
+      {/* Top controls */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-3 z-20">
+        <RoastHistory onSelect={(item) => setUrl(item.url)} />
+        <SoundToggle />
+      </div>
       {/* Hero gradient glow */}
       <div 
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] md:w-[800px] md:h-[800px] rounded-full pointer-events-none"
