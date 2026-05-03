@@ -32,38 +32,39 @@ export function HeroSection() {
   const [isFocused, setIsFocused] = useState(false)
   const [url, setUrl] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleRoast = async () => {
     if (!url.trim() || isLoading) return
-    
+
     console.log("[v0] Starting roast for URL:", url.trim())
+    setError(null)
     setIsLoading(true)
-    
+
     try {
-      console.log("[v0] Making POST request to /api/roast")
       const response = await fetch("/api/roast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       })
-      
+
       console.log("[v0] Response status:", response.status)
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error("[v0] API Error response:", errorData)
         throw new Error(errorData.details || errorData.error || "Failed to roast")
       }
-      
+
       const data = await response.json()
-      console.log("[v0] Roast data received:", data)
+      console.log("[v0] Roast data received, score:", data?.roastData?.overallScore)
       sessionStorage.setItem("roastData", JSON.stringify(data))
       router.push("/results")
-    } catch (error) {
-      console.error("[v0] Roast failed:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown error"
-      alert(`Roast failed: ${errorMessage}`)
+    } catch (err) {
+      console.error("[v0] Roast failed:", err)
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      setError(errorMessage)
       setIsLoading(false)
     }
   }
@@ -183,7 +184,7 @@ export function HeroSection() {
                 disabled={isLoading}
               />
             </div>
-            <button 
+            <button
               onClick={handleRoast}
               disabled={isLoading || !url.trim()}
               className="premium-button px-6 py-4 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -204,6 +205,25 @@ export function HeroSection() {
             </button>
           </div>
         </div>
+
+        {/* Helper / error text */}
+        {error ? (
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 text-sm text-[#ff4444] text-center"
+          >
+            {error}
+          </motion.p>
+        ) : isLoading ? (
+          <p className="mt-4 text-sm text-muted-foreground text-center">
+            analyzing your site... this may take a moment.
+          </p>
+        ) : (
+          <p className="mt-4 text-xs text-muted-foreground text-center">
+            try anything: vercel.com, your-portfolio.com, that-startup-you-hate.io
+          </p>
+        )}
       </motion.div>
     </section>
   )
