@@ -1,32 +1,72 @@
-import { generateText, Output } from "ai"
-import { z } from "zod"
+// Direct Google Gemini REST API — no SDKs, no Vercel AI Gateway.
+// Uses Gemini 2.5 Flash via the generativelanguage.googleapis.com endpoint.
 
-const ROAST_MODEL = "zai/glm-4.7-flash"
+const GEMINI_MODEL = "gemini-2.5-flash"
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
-const roastSchema = z.object({
-  overallScore: z.number().min(0).max(100).describe("Overall score 0-100, lower is worse"),
-  overallVerdict: z.string().describe("One punchy brutal sentence summarizing the site"),
-  fullRoast: z.string().describe("2-3 paragraph brutal but constructive roast"),
-  categories: z.object({
-    ui: z.object({
-      score: z.number().min(0).max(100),
-      comment: z.string().describe("Brutal one-liner about UI design"),
-    }),
-    ux: z.object({
-      score: z.number().min(0).max(100),
-      comment: z.string().describe("Brutal one-liner about UX flow"),
-    }),
-    copy: z.object({
-      score: z.number().min(0).max(100),
-      comment: z.string().describe("Brutal one-liner about copy and messaging"),
-    }),
-    performance: z.object({
-      score: z.number().min(0).max(100),
-      comment: z.string().describe("Brutal one-liner about performance"),
-    }),
-  }),
-  fixes: z.array(z.string()).min(3).max(6).describe("Actionable improvements"),
-})
+// JSON schema for Gemini's structured output (responseSchema).
+// Gemini follows OpenAPI 3 schema subset — keep it simple.
+const responseSchema = {
+  type: "object",
+  properties: {
+    overallScore: {
+      type: "integer",
+      description: "Overall score 0-100, lower is worse",
+    },
+    overallVerdict: {
+      type: "string",
+      description: "One punchy brutal sentence summarizing the site",
+    },
+    fullRoast: {
+      type: "string",
+      description: "2-3 paragraph brutal but constructive roast",
+    },
+    categories: {
+      type: "object",
+      properties: {
+        ui: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+        ux: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+        copy: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+        performance: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+      },
+      required: ["ui", "ux", "copy", "performance"],
+    },
+    fixes: {
+      type: "array",
+      items: { type: "string" },
+      description: "3-6 actionable improvements",
+    },
+  },
+  required: ["overallScore", "overallVerdict", "fullRoast", "categories", "fixes"],
+}
 
 function normalizeUrl(input: string): string {
   const trimmed = input.trim()
@@ -68,10 +108,63 @@ async function fetchSiteContext(url: string): Promise<{
   }
 }
 
+async function callGemini(prompt: string, apiKey: string) {
+  console.log("[v0] Calling Gemini API:", GEMINI_MODEL)
+
+  const response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.9,
+        responseMimeType: "application/json",
+        responseSchema,
+      },
+    }),
+    signal: AbortSignal.timeout(60000),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error("[v0] Gemini API error:", response.status, errorText)
+    throw new Error(`Gemini API error (${response.status}): ${errorText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  console.log("[v0] Gemini response received")
+
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) {
+    console.error("[v0] No text in Gemini response:", JSON.stringify(data).slice(0, 500))
+    throw new Error("Gemini returned no text content")
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch (parseError) {
+    console.error("[v0] Failed to parse Gemini JSON:", text.slice(0, 500))
+    throw new Error("Gemini returned invalid JSON")
+  }
+}
+
 export async function POST(request: Request) {
   console.log("[v0] Roast API called")
 
   try {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json(
+        { error: "GEMINI_API_KEY is not configured" },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const rawUrl = body?.url
 
@@ -86,13 +179,9 @@ export async function POST(request: Request) {
     const { title, description, screenshot } = await fetchSiteContext(url)
     console.log("[v0] Site title:", title)
 
-    console.log("[v0] Calling AI Gateway with", ROAST_MODEL)
+    const prompt = `You are ROAST — a brutally honest, witty AI website critic. You write savage but CONSTRUCTIVE roasts of websites. Your tone is sharp, clever, and unflinching, but you always deliver actionable insight underneath the burns. Never be hateful or personal — roast the *site*, not the people. Scores are 0-100 where lower is worse.
 
-    const { output } = await generateText({
-      model: ROAST_MODEL,
-      output: Output.object({ schema: roastSchema }),
-      system: `You are ROAST — a brutally honest, witty AI website critic. You write savage but CONSTRUCTIVE roasts of websites. Your tone is sharp, clever, and unflinching, but you always deliver actionable insight underneath the burns. Never be hateful or personal — roast the *site*, not the people. Scores are 0-100 where lower is worse.`,
-      prompt: `Roast this website:
+Roast this website:
 
 URL: ${url}
 Title: ${title}
@@ -105,10 +194,10 @@ Deliver:
 - categories.ui / ux / copy / performance: each with a 0-100 score and a witty one-liner
 - fixes: 3-6 actionable improvements
 
-Be witty. Be brutal. Be specific. No filler.`,
-    })
+Be witty. Be brutal. Be specific. No filler. Return ONLY the structured JSON.`
 
-    console.log("[v0] AI response received, score:", output.overallScore)
+    const output = await callGemini(prompt, apiKey)
+    console.log("[v0] Roast generated, score:", output.overallScore)
 
     return Response.json({
       roastData: output,
