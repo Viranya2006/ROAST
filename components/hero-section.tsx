@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Loader2 } from "lucide-react"
 
 function SoundWave() {
   return (
@@ -29,6 +30,43 @@ function SoundWave() {
 export function HeroSection() {
   const [isGlitching, setIsGlitching] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [url, setUrl] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+
+  const handleRoast = async () => {
+    if (!url.trim() || isLoading) return
+    
+    console.log("[v0] Starting roast for URL:", url.trim())
+    setIsLoading(true)
+    
+    try {
+      console.log("[v0] Making POST request to /api/roast")
+      const response = await fetch("/api/roast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      })
+      
+      console.log("[v0] Response status:", response.status)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] API Error response:", errorData)
+        throw new Error(errorData.details || errorData.error || "Failed to roast")
+      }
+      
+      const data = await response.json()
+      console.log("[v0] Roast data received:", data)
+      sessionStorage.setItem("roastData", JSON.stringify(data))
+      router.push("/results")
+    } catch (error) {
+      console.error("[v0] Roast failed:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      alert(`Roast failed: ${errorMessage}`)
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -137,14 +175,31 @@ export function HeroSection() {
                 type="url"
                 placeholder="drop your URL here. we won't be gentle."
                 className="flex-1 bg-transparent px-4 sm:px-2 py-4 text-foreground placeholder:text-muted-foreground focus:outline-none text-sm md:text-base"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
+                onKeyDown={(e) => e.key === "Enter" && handleRoast()}
+                disabled={isLoading}
               />
             </div>
-            <button className="premium-button px-6 py-4 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2">
+            <button 
+              onClick={handleRoast}
+              disabled={isLoading || !url.trim()}
+              className="premium-button px-6 py-4 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span className="relative flex items-center gap-2">
-                Roast It
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Roasting...
+                  </>
+                ) : (
+                  <>
+                    Roast It
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </>
+                )}
               </span>
             </button>
           </div>
