@@ -37,23 +37,33 @@ export function HeroSection() {
   const handleRoast = async () => {
     if (!url.trim() || isLoading) return
     
+    console.log("[v0] Starting roast for URL:", url.trim())
     setIsLoading(true)
+    
     try {
+      console.log("[v0] Making POST request to /api/roast")
       const response = await fetch("/api/roast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       })
       
+      console.log("[v0] Response status:", response.status)
+      
       if (!response.ok) {
-        throw new Error("Failed to roast")
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] API Error response:", errorData)
+        throw new Error(errorData.details || errorData.error || "Failed to roast")
       }
       
       const data = await response.json()
+      console.log("[v0] Roast data received:", data)
       sessionStorage.setItem("roastData", JSON.stringify(data))
       router.push("/results")
     } catch (error) {
-      console.error("Roast failed:", error)
+      console.error("[v0] Roast failed:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      alert(`Roast failed: ${errorMessage}`)
       setIsLoading(false)
     }
   }
