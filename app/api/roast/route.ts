@@ -71,27 +71,80 @@ Rules:
 
     // Call Claude
     console.log("[v0] Calling Claude with model:", process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514");
-    const message = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
+    let message;
+    try {
+      message = await anthropic.messages.create({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
+    } catch (apiError) {
+      console.error("[v0] Anthropic API call failed:", apiError);
+      throw new Error(`Anthropic API error: ${apiError instanceof Error ? apiError.message : "Unknown API error"}`);
+    }
+    
     console.log("[v0] Claude response received");
+    console.log("[v0] Full message object:", JSON.stringify(message, null, 2));
 
-    // Extract the text content
-    const textContent = message.content.find((block) => block.type === "text");
-    if (!textContent || textContent.type !== "text") {
+    // Extract the text content - handle different response structures
+    if (!message || !message.content) {
+      console.error("[v0] Invalid response structure - message:", message);
+      throw new Error("Invalid response from Claude - no content field");
+    }
+    
+    console.log("[v0] message.content type:", typeof message.content);
+    console.log("[v0] message.content:", JSON.stringify(message.content, null, 2));
+    
+    const textContent = Array.isArray(message.content) 
+      ? message.content.find((block: { type: string }) => block.type === "text")
+      : message.content;
+      
+    if (!textContent) {
       throw new Error("No text response from Claude");
     }
+    
+    const responseText = typeof textContent === "string" 
+      ? textContent 
+      : (textContent as { type: string; text: string }).text;
+      
+    if (!responseText) {
+      throw new Error("Could not extract text from Claude response");
+    }
+    
+    console.log("[v0] Extracted response text:", responseText.substring(0, 200) + "...");
 
     // Parse the JSON response
     console.log("[v0] Parsing Claude response...");
-    const roastData = JSON.parse(textContent.text);
+    
+    // Clean the response text - remove any markdown code blocks if present
+    let cleanedText = responseText.trim();
+    if (cleanedText.startsWith("```json")) {
+      cleanedText = cleanedText.slice(7);
+    }
+    if (cleanedText.startsWith("```")) {
+      cleanedText = cleanedText.slice(3);
+    }
+    if (cleanedText.endsWith("```")) {
+      cleanedText = cleanedText.slice(0, -3);
+    }
+    cleanedText = cleanedText.trim();
+    
+    console.log("[v0] Cleaned text to parse:", cleanedText.substring(0, 200) + "...");
+    
+    let roastData;
+    try {
+      roastData = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error("[v0] JSON parse failed:", parseError);
+      console.error("[v0] Text that failed to parse:", cleanedText);
+      throw new Error("Failed to parse Claude response as JSON");
+    }
+    
     console.log("[v0] Roast data parsed successfully");
 
     return Response.json({ roastData, screenshot, url });
