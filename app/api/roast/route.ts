@@ -30,14 +30,6 @@ export async function POST(request: Request) {
     console.log("[v0] Site title:", siteTitle);
     console.log("[v0] Screenshot URL:", screenshot ? "obtained" : "null");
 
-    // Initialize Anthropic client
-    console.log("[v0] Initializing Anthropic client...");
-    const anthropic = new Anthropic({
-      baseURL: process.env.ANTHROPIC_BASE_URL,
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-    console.log("[v0] Anthropic client initialized");
-
     // Create the prompt for Claude
     const prompt = `You are ROAST, a brutally honest AI website critic. Analyze this website and provide a savage but constructive roast.
 
