@@ -36,40 +36,42 @@ const cardVariants = {
   visible: { 
     opacity: 1, 
     y: 0,
-    transition: { duration: 0.6, ease: "easeOut" }
+    transition: { duration: 0.5, ease: "easeOut" }
   }
 }
 
 export function FeaturesSection() {
   return (
-    <section className="py-24 px-4">
+    <section className="py-24 md:py-32 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8"
         >
           {features.map((feature, index) => (
             <motion.div
               key={index}
               variants={cardVariants}
-              whileHover={{ y: -8, transition: { duration: 0.3 } }}
-              className="group relative glass rounded-2xl p-8 overflow-hidden"
+              className="group relative glass rounded-2xl p-8 overflow-hidden premium-card cursor-default"
             >
               {/* Top border glow */}
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-40 group-hover:opacity-100 transition-opacity duration-300" />
               
               {/* Hover glow effect */}
               <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               
+              {/* Corner accent */}
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors duration-300">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:shadow-[0_0_20px_rgba(0,255,65,0.2)] transition-all duration-300">
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
                 <h3 
-                  className="text-xl font-bold mb-3 text-foreground"
+                  className="text-xl font-bold mb-4 text-foreground"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
                   {feature.title}

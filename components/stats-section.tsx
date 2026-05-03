@@ -48,7 +48,7 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.2
+      staggerChildren: 0.15
     }
   }
 }
@@ -58,20 +58,20 @@ const itemVariants = {
   visible: { 
     opacity: 1, 
     y: 0,
-    transition: { duration: 0.6, ease: "easeOut" }
+    transition: { duration: 0.5, ease: "easeOut" }
   }
 }
 
 export function StatsSection() {
   return (
-    <section className="py-24 px-4">
+    <section className="py-24 md:py-32 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-12 md:gap-16 text-center"
         >
           {stats.map((stat, index) => (
             <motion.div
@@ -79,13 +79,15 @@ export function StatsSection() {
               variants={itemVariants}
               className="group"
             >
-              <div 
-                className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-3 group-hover:text-primary transition-colors duration-300"
+              <motion.div 
+                className="text-5xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-foreground mb-4 transition-colors duration-300 group-hover:text-primary"
                 style={{ fontFamily: 'var(--font-display)' }}
+                whileHover={{ scale: 1.05 }}
+                transition={{ duration: 0.2 }}
               >
                 <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-              </div>
-              <p className="text-muted-foreground text-lg tracking-wide uppercase">
+              </motion.div>
+              <p className="text-muted-foreground text-sm md:text-base tracking-widest uppercase">
                 {stat.label}
               </p>
             </motion.div>

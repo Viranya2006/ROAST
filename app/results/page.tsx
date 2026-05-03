@@ -57,27 +57,27 @@ export default function ResultsPage() {
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.4 }}
           className="sticky top-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl"
         >
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
               {/* Favicon placeholder */}
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                <ExternalLink className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground" />
               </div>
-              <span className="text-foreground font-medium">{mockData.url}</span>
+              <span className="text-foreground text-sm md:text-base font-medium truncate">{mockData.url}</span>
               
               {/* Analyzed badge */}
               <motion.span
                 animate={{ 
                   boxShadow: [
                     "0 0 0 0 rgba(0,255,65,0.4)",
-                    "0 0 0 8px rgba(0,255,65,0)",
+                    "0 0 0 6px rgba(0,255,65,0)",
                   ]
                 }}
                 transition={{ duration: 1.5, repeat: Infinity }}
-                className="px-3 py-1 rounded-full text-xs uppercase tracking-widest font-medium bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/20"
+                className="hidden sm:inline-flex px-2.5 md:px-3 py-1 rounded-full text-[10px] md:text-xs uppercase tracking-widest font-medium bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/20 flex-shrink-0"
               >
                 Analyzed
               </motion.span>
@@ -85,15 +85,15 @@ export default function ResultsPage() {
 
             <Link
               href="/"
-              className="px-4 py-2 rounded-full text-sm font-medium border border-white/10 text-foreground hover:border-[#00FF41]/40 hover:text-[#00FF41] transition-all duration-200"
+              className="px-3 md:px-4 py-2 rounded-full text-xs md:text-sm font-medium border border-white/10 text-foreground hover:border-[#00FF41]/40 hover:text-[#00FF41] hover:shadow-[0_0_20px_rgba(0,255,65,0.15)] transition-all duration-300 whitespace-nowrap flex-shrink-0"
             >
-              Roast Another →
+              Roast Another
             </Link>
           </div>
         </motion.header>
 
         {/* Content */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 space-y-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 lg:py-24 space-y-16 md:space-y-24">
           {/* Hero Score Section */}
           <section className="flex flex-col items-center">
             <ScoreGauge score={mockData.overallScore} verdict={mockData.verdict} />
@@ -101,7 +101,7 @@ export default function ResultsPage() {
 
           {/* Category Grid */}
           <section>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
               {mockData.categories.map((cat, index) => (
                 <CategoryCard
                   key={cat.category}
@@ -129,20 +129,20 @@ export default function ResultsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 3.8 }}
-            className="flex flex-col items-center gap-6"
+            className="flex flex-col items-center gap-6 pb-8"
           >
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <button className="px-8 py-4 rounded-full bg-[#00FF41] text-black font-bold text-base uppercase tracking-wider hover:shadow-[0_0_30px_rgba(0,255,65,0.5)] transition-all duration-200">
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+              <button className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#00FF41] text-black font-bold text-sm md:text-base uppercase tracking-wider premium-button">
                 Share Your Shame
               </button>
               <Link
                 href="/"
-                className="px-8 py-4 rounded-full border border-white/20 text-foreground font-bold text-base uppercase tracking-wider hover:border-[#00FF41]/40 hover:text-[#00FF41] transition-all duration-200"
+                className="w-full sm:w-auto px-8 py-4 rounded-full border border-white/20 text-foreground font-bold text-sm md:text-base uppercase tracking-wider hover:border-[#00FF41]/40 hover:text-[#00FF41] hover:shadow-[0_0_20px_rgba(0,255,65,0.15)] transition-all duration-300 text-center"
               >
                 Roast Another Site
               </Link>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground">
               warn your developer before sharing
             </p>
           </motion.section>

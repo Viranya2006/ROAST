@@ -41,11 +41,11 @@ export function TypewriterVerdict({ text }: TypewriterVerdictProps) {
       transition={{ duration: 0.5, delay: 2.3 }}
       className="w-full"
     >
-      <h3 className="text-sm uppercase tracking-widest text-[#00FF41] mb-4 font-mono">
+      <h3 className="text-xs md:text-sm uppercase tracking-widest text-[#00FF41] mb-4 font-mono">
         {"// THE VERDICT"}
       </h3>
       
-      <div className="relative p-6 md:p-8 rounded-2xl bg-black border border-[#00FF41]/20 overflow-hidden">
+      <div className="relative p-4 sm:p-6 md:p-8 rounded-2xl bg-black border border-[#00FF41]/20 overflow-hidden">
         {/* Scanline effect */}
         <div 
           className="absolute inset-0 pointer-events-none opacity-[0.03]"
@@ -56,15 +56,16 @@ export function TypewriterVerdict({ text }: TypewriterVerdictProps) {
         
         {/* Terminal glow */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#00FF41]/30 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#00FF41]/10 to-transparent" />
         
-        <p className="font-mono text-base md:text-lg leading-relaxed text-[#00FF41]/90">
+        <p className="font-mono text-sm sm:text-base md:text-lg leading-relaxed text-[#00FF41]/90">
           <span className="text-[#00FF41]/50 mr-2">$</span>
           {displayText}
           {isTyping && (
             <motion.span
               animate={{ opacity: [1, 0] }}
               transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
-              className="inline-block w-3 h-5 ml-1 bg-[#00FF41] align-middle"
+              className="inline-block w-2 md:w-3 h-4 md:h-5 ml-1 bg-[#00FF41] align-middle"
             />
           )}
         </p>
