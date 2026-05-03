@@ -1,5 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-
 export async function POST(request: Request) {
   console.log("[v0] Roast API called");
   
@@ -69,12 +67,23 @@ Rules:
 - fixes should be actionable improvements
 - overallVerdict is one punchy sentence summarizing the site`;
 
-    // Call Claude
-    console.log("[v0] Calling Claude with model:", process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514");
-    let message;
-    try {
-      message = await anthropic.messages.create({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+    // Call Claude using raw fetch for better compatibility with custom baseURL
+    const modelToUse = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+    const baseUrl = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
+    const apiUrl = `${baseUrl}${baseUrl.endsWith("/") ? "" : "/"}v1/messages`;
+    
+    console.log("[v0] Calling Claude with model:", modelToUse);
+    console.log("[v0] API URL:", apiUrl);
+    
+    const claudeResponse = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: modelToUse,
         max_tokens: 1024,
         messages: [
           {
@@ -82,38 +91,49 @@ Rules:
             content: prompt,
           },
         ],
-      });
-    } catch (apiError) {
-      console.error("[v0] Anthropic API call failed:", apiError);
-      throw new Error(`Anthropic API error: ${apiError instanceof Error ? apiError.message : "Unknown API error"}`);
+      }),
+    });
+    
+    console.log("[v0] Claude response status:", claudeResponse.status);
+    
+    if (!claudeResponse.ok) {
+      const errorText = await claudeResponse.text();
+      console.error("[v0] Claude API error response:", errorText);
+      throw new Error(`Claude API error (${claudeResponse.status}): ${errorText}`);
     }
     
+    const message = await claudeResponse.json();
     console.log("[v0] Claude response received");
     console.log("[v0] Full message object:", JSON.stringify(message, null, 2));
 
     // Extract the text content - handle different response structures
-    if (!message || !message.content) {
-      console.error("[v0] Invalid response structure - message:", message);
-      throw new Error("Invalid response from Claude - no content field");
+    let responseText: string | undefined;
+    
+    // Handle standard Anthropic format: { content: [{ type: "text", text: "..." }] }
+    if (message.content && Array.isArray(message.content)) {
+      const textBlock = message.content.find((block: { type: string }) => block.type === "text");
+      responseText = textBlock?.text;
+    }
+    // Handle if content is a string directly
+    else if (typeof message.content === "string") {
+      responseText = message.content;
+    }
+    // Handle OpenAI-compatible format: { choices: [{ message: { content: "..." } }] }
+    else if (message.choices && Array.isArray(message.choices)) {
+      responseText = message.choices[0]?.message?.content;
+    }
+    // Handle direct text field
+    else if (message.text) {
+      responseText = message.text;
+    }
+    // Handle completion field
+    else if (message.completion) {
+      responseText = message.completion;
     }
     
-    console.log("[v0] message.content type:", typeof message.content);
-    console.log("[v0] message.content:", JSON.stringify(message.content, null, 2));
-    
-    const textContent = Array.isArray(message.content) 
-      ? message.content.find((block: { type: string }) => block.type === "text")
-      : message.content;
-      
-    if (!textContent) {
-      throw new Error("No text response from Claude");
-    }
-    
-    const responseText = typeof textContent === "string" 
-      ? textContent 
-      : (textContent as { type: string; text: string }).text;
-      
     if (!responseText) {
-      throw new Error("Could not extract text from Claude response");
+      console.error("[v0] Could not extract text. Full response:", JSON.stringify(message, null, 2));
+      throw new Error("Could not extract text from API response");
     }
     
     console.log("[v0] Extracted response text:", responseText.substring(0, 200) + "...");
