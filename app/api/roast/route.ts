@@ -1,34 +1,7 @@
 import { generateText, Output } from "ai"
-import { createAnthropic } from "@ai-sdk/anthropic"
 import { z } from "zod"
 
-// Pick the best available model based on which keys are configured.
-// Priority: real Vercel AI Gateway key (vck_*) → direct Anthropic API key (sk-ant-*) → fail
-function resolveModel() {
-  const gatewayKey = process.env.AI_GATEWAY_API_KEY
-  const anthropicKey = process.env.ANTHROPIC_API_KEY
-
-  if (gatewayKey?.startsWith("vck_")) {
-    console.log("[v0] Using Vercel AI Gateway (vck_ key detected)")
-    return "anthropic/claude-sonnet-4.6"
-  }
-
-  if (anthropicKey?.startsWith("sk-ant-")) {
-    console.log("[v0] Using direct Anthropic API")
-    const anthropic = createAnthropic({ apiKey: anthropicKey })
-    return anthropic("claude-sonnet-4-5-20250929")
-  }
-
-  // Last-ditch: try the gateway with whatever key is set
-  if (gatewayKey || anthropicKey) {
-    console.log("[v0] No recognized key prefix - attempting AI Gateway anyway")
-    return "anthropic/claude-sonnet-4.6"
-  }
-
-  throw new Error(
-    "No valid AI provider key found. Set AI_GATEWAY_API_KEY (from vercel.com/dashboard, starts with 'vck_') or ANTHROPIC_API_KEY (from console.anthropic.com, starts with 'sk-ant-')."
-  )
-}
+const ROAST_MODEL = "zai/glm-4.7-flash"
 
 const roastSchema = z.object({
   overallScore: z.number().min(0).max(100).describe("Overall score 0-100, lower is worse"),
@@ -113,10 +86,10 @@ export async function POST(request: Request) {
     const { title, description, screenshot } = await fetchSiteContext(url)
     console.log("[v0] Site title:", title)
 
-    const model = resolveModel()
+    console.log("[v0] Calling AI Gateway with", ROAST_MODEL)
 
     const { output } = await generateText({
-      model,
+      model: ROAST_MODEL,
       output: Output.object({ schema: roastSchema }),
       system: `You are ROAST — a brutally honest, witty AI website critic. You write savage but CONSTRUCTIVE roasts of websites. Your tone is sharp, clever, and unflinching, but you always deliver actionable insight underneath the burns. Never be hateful or personal — roast the *site*, not the people. Scores are 0-100 where lower is worse.`,
       prompt: `Roast this website:
