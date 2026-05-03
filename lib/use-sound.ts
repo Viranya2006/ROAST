@@ -17,7 +17,8 @@ export function useSound() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored !== null) {
-        setIsMuted(stored === "false" ? false : true)
+        // stored === "false" means sound is enabled (not muted)
+        setIsMuted(stored !== "false")
       }
     } catch {
       // Ignore errors
@@ -25,33 +26,43 @@ export function useSound() {
     setIsLoaded(true)
   }, [])
 
-  // Initialize AudioContext lazily
-  const getAudioContext = useCallback(() => {
+  // Initialize AudioContext lazily and resume if suspended
+  const getAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     }
+    
+    // Resume if suspended (browsers require user interaction)
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume()
+    }
+    
     return audioContextRef.current
   }, [])
 
-  // Toggle mute
-  const toggleMute = useCallback(() => {
-    setIsMuted((prev) => {
-      const newValue = !prev
-      try {
-        localStorage.setItem(STORAGE_KEY, String(!newValue))
-      } catch {
-        // Ignore errors
+  // Toggle mute and resume AudioContext on unmute
+  const toggleMute = useCallback(async () => {
+    const newMuted = !isMuted
+    setIsMuted(newMuted)
+    
+    try {
+      localStorage.setItem(STORAGE_KEY, newMuted ? "true" : "false")
+      
+      // If unmuting, try to resume AudioContext immediately
+      if (!newMuted && audioContextRef.current?.state === "suspended") {
+        await audioContextRef.current.resume()
       }
-      return newValue
-    })
-  }, [])
+    } catch {
+      // Ignore errors
+    }
+  }, [isMuted])
 
   // Play a beep sound (terminal style)
-  const playBeep = useCallback(() => {
+  const playBeep = useCallback(async () => {
     if (isMuted) return
     
     try {
-      const ctx = getAudioContext()
+      const ctx = await getAudioContext()
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
       
@@ -72,11 +83,11 @@ export function useSound() {
   }, [isMuted, getAudioContext])
 
   // Play a "thunk" sound (score reveal)
-  const playThunk = useCallback(() => {
+  const playThunk = useCallback(async () => {
     if (isMuted) return
     
     try {
-      const ctx = getAudioContext()
+      const ctx = await getAudioContext()
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
       
@@ -98,11 +109,11 @@ export function useSound() {
   }, [isMuted, getAudioContext])
 
   // Play a success/positive sound
-  const playSuccess = useCallback(() => {
+  const playSuccess = useCallback(async () => {
     if (isMuted) return
     
     try {
-      const ctx = getAudioContext()
+      const ctx = await getAudioContext()
       
       const playTone = (freq: number, delay: number) => {
         const oscillator = ctx.createOscillator()
@@ -131,11 +142,11 @@ export function useSound() {
   }, [isMuted, getAudioContext])
 
   // Play typing sound
-  const playType = useCallback(() => {
+  const playType = useCallback(async () => {
     if (isMuted) return
     
     try {
-      const ctx = getAudioContext()
+      const ctx = await getAudioContext()
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
       
