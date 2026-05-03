@@ -1,11 +1,5 @@
 import { generateText, Output } from "ai"
-import { createAnthropic } from "@ai-sdk/anthropic"
 import { z } from "zod"
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL,
-})
 
 const roastSchema = z.object({
   overallScore: z.number().min(0).max(100).describe("Overall score 0-100, lower is worse"),
@@ -90,11 +84,10 @@ export async function POST(request: Request) {
     const { title, description, screenshot } = await fetchSiteContext(url)
     console.log("[v0] Site title:", title)
 
-    const modelId = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929"
-    console.log("[v0] Calling Anthropic with model:", modelId)
+    console.log("[v0] Calling AI Gateway with anthropic/claude-sonnet-4.5")
 
     const { output } = await generateText({
-      model: anthropic(modelId),
+      model: "anthropic/claude-sonnet-4.5",
       output: Output.object({ schema: roastSchema }),
       system: `You are ROAST — a brutally honest, witty AI website critic. You write savage but CONSTRUCTIVE roasts of websites. Your tone is sharp, clever, and unflinching, but you always deliver actionable insight underneath the burns. Never be hateful or personal — roast the *site*, not the people. Scores are 0-100 where lower is worse.`,
       prompt: `Roast this website:
