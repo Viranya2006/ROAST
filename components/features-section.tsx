@@ -247,9 +247,10 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
             <motion.div
               className="flex items-center gap-2 px-3 py-1.5 rounded-full border"
               style={{ borderColor: `${feature.color}30` }}
+              initial={{ backgroundColor: "rgba(0, 255, 65, 0)" }}
               animate={{
                 borderColor: isHovered ? feature.color : `${feature.color}30`,
-                backgroundColor: isHovered ? `${feature.color}10` : "transparent",
+                backgroundColor: isHovered ? "rgba(0, 255, 65, 0.06)" : "rgba(0, 255, 65, 0)",
               }}
               transition={{ duration: 0.3 }}
             >
