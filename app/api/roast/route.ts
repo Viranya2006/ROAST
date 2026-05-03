@@ -1,172 +1,215 @@
-export async function POST(request: Request) {
-  console.log("[v0] Roast API called");
-  
-  try {
-    const body = await request.json();
-    const { url } = body;
-    
-    console.log("[v0] Incoming URL:", url);
-    console.log("[v0] ANTHROPIC_BASE_URL:", process.env.ANTHROPIC_BASE_URL ? "set" : "NOT SET");
-    console.log("[v0] ANTHROPIC_API_KEY:", process.env.ANTHROPIC_API_KEY ? "set" : "NOT SET");
-    console.log("[v0] ANTHROPIC_MODEL:", process.env.ANTHROPIC_MODEL || "not set, using default");
+// Direct Google Gemini REST API — no SDKs, no Vercel AI Gateway.
+// Uses Gemini 2.5 Flash via the generativelanguage.googleapis.com endpoint.
 
-    if (!url) {
-      console.log("[v0] Error: URL is required");
-      return Response.json({ error: "URL is required" }, { status: 400 });
-    }
+const GEMINI_MODEL = "gemini-2.5-flash"
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
-    // Fetch site metadata from Microlink
-    console.log("[v0] Fetching Microlink data...");
-    const encodedUrl = encodeURIComponent(url);
-    const microlinkResponse = await fetch(
-      `https://api.microlink.io?url=${encodedUrl}&screenshot=true&meta=true`
-    );
-    const microlinkData = await microlinkResponse.json();
-    console.log("[v0] Microlink response status:", microlinkData.status);
-
-    const siteTitle = microlinkData.data?.title || "Unknown";
-    const siteDescription = microlinkData.data?.description || "No description available";
-    const screenshot = microlinkData.data?.screenshot?.url || null;
-    console.log("[v0] Site title:", siteTitle);
-    console.log("[v0] Screenshot URL:", screenshot ? "obtained" : "null");
-
-    // Create the prompt for Claude
-    const prompt = `You are ROAST, a brutally honest AI website critic. Analyze this website and provide a savage but constructive roast.
-
-Website URL: ${url}
-Title: ${siteTitle}
-Description: ${siteDescription}
-
-Respond ONLY with valid JSON in this exact format, no markdown, no extra text:
-{
-  "overallScore": 42,
-  "overallVerdict": "one punchy brutal sentence",
-  "fullRoast": "2-3 paragraph brutal roast",
-  "categories": {
-    "ui": { "score": 40, "comment": "brutal one-liner" },
-    "ux": { "score": 50, "comment": "brutal one-liner" },
-    "copy": { "score": 35, "comment": "brutal one-liner" },
-    "performance": { "score": 60, "comment": "brutal one-liner" }
+// JSON schema for Gemini's structured output (responseSchema).
+// Gemini follows OpenAPI 3 schema subset — keep it simple.
+const responseSchema = {
+  type: "object",
+  properties: {
+    overallScore: {
+      type: "integer",
+      description: "Overall score 0-100, lower is worse",
+    },
+    overallVerdict: {
+      type: "string",
+      description: "One punchy brutal sentence summarizing the site",
+    },
+    fullRoast: {
+      type: "string",
+      description: "2-3 paragraph brutal but constructive roast",
+    },
+    categories: {
+      type: "object",
+      properties: {
+        ui: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+        ux: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+        copy: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+        performance: {
+          type: "object",
+          properties: {
+            score: { type: "integer" },
+            comment: { type: "string" },
+          },
+          required: ["score", "comment"],
+        },
+      },
+      required: ["ui", "ux", "copy", "performance"],
+    },
+    fixes: {
+      type: "array",
+      items: { type: "string" },
+      description: "3-6 actionable improvements",
+    },
   },
-  "fixes": ["fix 1", "fix 2", "fix 3", "fix 4"]
+  required: ["overallScore", "overallVerdict", "fullRoast", "categories", "fixes"],
 }
 
-Rules:
-- Scores are 0-100 (lower = worse)
-- Be brutally honest but constructive
-- Comments should be witty and memorable
-- fullRoast should be 2-3 paragraphs of savage critique
-- fixes should be actionable improvements
-- overallVerdict is one punchy sentence summarizing the site`;
+function normalizeUrl(input: string): string {
+  const trimmed = input.trim()
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`
+  }
+  return trimmed
+}
 
-    // Call Claude using raw fetch for better compatibility with custom baseURL
-    const modelToUse = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
-    const baseUrl = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
-    const apiUrl = `${baseUrl}${baseUrl.endsWith("/") ? "" : "/"}v1/messages`;
-    
-    console.log("[v0] Calling Claude with model:", modelToUse);
-    console.log("[v0] API URL:", apiUrl);
-    
-    const claudeResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: modelToUse,
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
-    });
-    
-    console.log("[v0] Claude response status:", claudeResponse.status);
-    
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      console.error("[v0] Claude API error response:", errorText);
-      throw new Error(`Claude API error (${claudeResponse.status}): ${errorText}`);
-    }
-    
-    const message = await claudeResponse.json();
-    console.log("[v0] Claude response received");
-    console.log("[v0] Full message object:", JSON.stringify(message, null, 2));
+async function fetchSiteContext(url: string): Promise<{
+  title: string
+  description: string
+  screenshot: string | null
+}> {
+  try {
+    console.log("[v0] Fetching Microlink data for:", url)
+    const encodedUrl = encodeURIComponent(url)
+    const microlinkResponse = await fetch(
+      `https://api.microlink.io?url=${encodedUrl}&screenshot=true&meta=true`,
+      { signal: AbortSignal.timeout(15000) }
+    )
 
-    // Extract the text content - handle different response structures
-    let responseText: string | undefined;
-    
-    // Handle standard Anthropic format: { content: [{ type: "text", text: "..." }] }
-    if (message.content && Array.isArray(message.content)) {
-      const textBlock = message.content.find((block: { type: string }) => block.type === "text");
-      responseText = textBlock?.text;
+    if (!microlinkResponse.ok) {
+      console.log("[v0] Microlink response not OK:", microlinkResponse.status)
+      return { title: "Unknown", description: "Unable to fetch metadata", screenshot: null }
     }
-    // Handle if content is a string directly
-    else if (typeof message.content === "string") {
-      responseText = message.content;
-    }
-    // Handle OpenAI-compatible format: { choices: [{ message: { content: "..." } }] }
-    else if (message.choices && Array.isArray(message.choices)) {
-      responseText = message.choices[0]?.message?.content;
-    }
-    // Handle direct text field
-    else if (message.text) {
-      responseText = message.text;
-    }
-    // Handle completion field
-    else if (message.completion) {
-      responseText = message.completion;
-    }
-    
-    if (!responseText) {
-      console.error("[v0] Could not extract text. Full response:", JSON.stringify(message, null, 2));
-      throw new Error("Could not extract text from API response");
-    }
-    
-    console.log("[v0] Extracted response text:", responseText.substring(0, 200) + "...");
 
-    // Parse the JSON response
-    console.log("[v0] Parsing Claude response...");
-    
-    // Clean the response text - remove any markdown code blocks if present
-    let cleanedText = responseText.trim();
-    if (cleanedText.startsWith("```json")) {
-      cleanedText = cleanedText.slice(7);
-    }
-    if (cleanedText.startsWith("```")) {
-      cleanedText = cleanedText.slice(3);
-    }
-    if (cleanedText.endsWith("```")) {
-      cleanedText = cleanedText.slice(0, -3);
-    }
-    cleanedText = cleanedText.trim();
-    
-    console.log("[v0] Cleaned text to parse:", cleanedText.substring(0, 200) + "...");
-    
-    let roastData;
-    try {
-      roastData = JSON.parse(cleanedText);
-    } catch (parseError) {
-      console.error("[v0] JSON parse failed:", parseError);
-      console.error("[v0] Text that failed to parse:", cleanedText);
-      throw new Error("Failed to parse Claude response as JSON");
-    }
-    
-    console.log("[v0] Roast data parsed successfully");
+    const microlinkData = await microlinkResponse.json()
+    console.log("[v0] Microlink status:", microlinkData.status)
 
-    return Response.json({ roastData, screenshot, url });
+    return {
+      title: microlinkData.data?.title || "Unknown",
+      description: microlinkData.data?.description || "No description available",
+      screenshot: microlinkData.data?.screenshot?.url || null,
+    }
   } catch (error) {
-    console.error("[v0] Roast API error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("[v0] Error message:", errorMessage);
+    console.error("[v0] Microlink fetch failed:", error)
+    return { title: "Unknown", description: "Unable to fetch metadata", screenshot: null }
+  }
+}
+
+async function callGemini(prompt: string, apiKey: string) {
+  console.log("[v0] Calling Gemini API:", GEMINI_MODEL)
+
+  const response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.9,
+        responseMimeType: "application/json",
+        responseSchema,
+      },
+    }),
+    signal: AbortSignal.timeout(60000),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error("[v0] Gemini API error:", response.status, errorText)
+    throw new Error(`Gemini API error (${response.status}): ${errorText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  console.log("[v0] Gemini response received")
+
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) {
+    console.error("[v0] No text in Gemini response:", JSON.stringify(data).slice(0, 500))
+    throw new Error("Gemini returned no text content")
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch (parseError) {
+    console.error("[v0] Failed to parse Gemini JSON:", text.slice(0, 500))
+    throw new Error("Gemini returned invalid JSON")
+  }
+}
+
+export async function POST(request: Request) {
+  console.log("[v0] Roast API called")
+
+  try {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json(
+        { error: "GEMINI_API_KEY is not configured" },
+        { status: 500 }
+      )
+    }
+
+    const body = await request.json()
+    const rawUrl = body?.url
+
+    if (!rawUrl || typeof rawUrl !== "string") {
+      return Response.json({ error: "URL is required" }, { status: 400 })
+    }
+
+    const url = normalizeUrl(rawUrl)
+    console.log("[v0] Normalized URL:", url)
+
+    // Fetch site metadata + screenshot (gracefully degrades if it fails)
+    const { title, description, screenshot } = await fetchSiteContext(url)
+    console.log("[v0] Site title:", title)
+
+    const prompt = `You are ROAST — a brutally honest, witty AI website critic. You write savage but CONSTRUCTIVE roasts of websites. Your tone is sharp, clever, and unflinching, but you always deliver actionable insight underneath the burns. Never be hateful or personal — roast the *site*, not the people. Scores are 0-100 where lower is worse.
+
+Roast this website:
+
+URL: ${url}
+Title: ${title}
+Description: ${description}
+
+Deliver:
+- overallScore (0-100, lower = worse)
+- overallVerdict: one punchy brutal sentence
+- fullRoast: 2-3 paragraphs of savage but constructive critique
+- categories.ui / ux / copy / performance: each with a 0-100 score and a witty one-liner
+- fixes: 3-6 actionable improvements
+
+Be witty. Be brutal. Be specific. No filler. Return ONLY the structured JSON.`
+
+    const output = await callGemini(prompt, apiKey)
+    console.log("[v0] Roast generated, score:", output.overallScore)
+
+    return Response.json({
+      roastData: output,
+      screenshot,
+      url,
+    })
+  } catch (error) {
+    console.error("[v0] Roast API error:", error)
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     return Response.json(
       { error: "Failed to roast the website", details: errorMessage },
       { status: 500 }
-    );
+    )
   }
 }
